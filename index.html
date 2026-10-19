@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ClickHouse Issue Triage & Prioritizer</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 24px;
+            background: #0d1117;
+            color: #c9d1d9;
+            line-height: 1.5;
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        h1 {
+            color: #58a6ff;
+            margin: 0 0 6px 0;
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .subtitle {
+            color: #8b949e;
+            font-size: 14px;
+        }
+        .github-btn {
+            background: #21262d;
+            border: 1px solid #30363d;
+            color: #c9d1d9;
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .github-btn:hover {
+            background: #30363d;
+            color: #fff;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 14px 18px;
+        }
+        .stat-val {
+            font-size: 24px;
+            font-weight: 700;
+            color: #f0f6fc;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #8b949e;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 4px;
+        }
+        .controls {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+            background: #161b22;
+            padding: 16px;
+            border-radius: 8px;
+            border: 1px solid #30363d;
+            align-items: center;
+        }
+        input, select {
+            background: #0d1117;
+            color: #c9d1d9;
+            border: 1px solid #30363d;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            outline: none;
+        }
+        input:focus, select:focus {
+            border-color: #58a6ff;
+        }
+        .badge {
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            display: inline-block;
+            white-space: nowrap;
+        }
+        .badge-t1 { background: #d73a49; color: #fff; }
+        .badge-t2 { background: #238636; color: #fff; }
+        .badge-t3 { background: #1f6feb; color: #fff; }
+        .badge-t4 { background: #6e7681; color: #fff; }
+        .badge-comp { background: #21262d; color: #8b949e; border: 1px solid #30363d; }
+        .table-wrap {
+            overflow-x: auto;
+            border-radius: 8px;
+            border: 1px solid #30363d;
+            background: #161b22;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 12px 14px;
+            text-align: left;
+            border-bottom: 1px solid #21262d;
+            font-size: 13px;
+        }
+        th {
+            background: #1b2028;
+            color: #8b949e;
+            font-weight: 600;
+        }
+        tr:hover { background: #1f242c; }
+        a {
+            color: #58a6ff;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        a:hover { text-decoration: underline; }
+        .score-pill {
+            font-weight: 700;
+            color: #f0883e;
+            font-size: 14px;
+        }
+        .filter-status {
+            margin-left: auto;
+            color: #8b949e;
+            font-size: 13px;
+        }
+        .label-pill {
+            font-size: 10px;
+            padding: 1px 6px;
+            border-radius: 10px;
+            background: #21262d;
+            color: #8b949e;
+            margin-right: 4px;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <h1>ClickHouse Issue Triage & Prioritizer</h1>
+            <div class="subtitle">Real-time local cache tracking, sorting, and triaging ClickHouse GitHub issues.</div>
+        </div>
+        <div>
+            <a href="https://github.com/ClickHouse/ClickHouse/issues" target="_blank" class="github-btn">
+                ↗ ClickHouse Issues
+            </a>
+        </div>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-val" id="stat-total">-</div>
+            <div class="stat-label">Total Synced</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-val" style="color: #3fb950;" id="stat-actionable">-</div>
+            <div class="stat-label">Actionable (No PR/Assignee)</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-val" style="color: #f85149;" id="stat-tier1">-</div>
+            <div class="stat-label">Tier 1 High Priority</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-val" style="color: #8b949e;" id="stat-claimed">-</div>
+            <div class="stat-label">Claimed / In Progress</div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <input type="text" id="search" placeholder="Search title, label, or #number..." style="width: 280px;" oninput="render()">
+        
+        <select id="filterTier" onchange="render()">
+            <option value="">All Tiers</option>
+            <option value="Tier 1" selected>Tier 1 (High Priority Actionable)</option>
+            <option value="Tier 2">Tier 2 (Good First / Accessible)</option>
+            <option value="Tier 3">Tier 3 (Feature / RFC)</option>
+            <option value="Tier 4">Tier 4 (Claimed / Has PR)</option>
+        </select>
+
+        <select id="filterComponent" onchange="render()">
+            <option value="">All Components</option>
+        </select>
+
+        <select id="sortBy" onchange="render()">
+            <option value="score_desc">Sort: Priority Score (High to Low)</option>
+            <option value="reactions_desc">Sort: Most Reactions</option>
+            <option value="comments_desc">Sort: Most Comments</option>
+            <option value="newest">Sort: Newest First</option>
+        </select>
+
+        <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+            <input type="checkbox" id="onlyNoPR" checked onchange="render()"> Actionable Only (No PR, Unassigned)
+        </label>
+
+        <div class="filter-status" id="stats">Loading issues...</div>
+    </div>
+
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 75px;">Score</th>
+                    <th style="width: 90px;">Issue</th>
+                    <th>Title & Labels</th>
+                    <th style="width: 160px;">Component</th>
+                    <th style="width: 150px;">Tier</th>
+                    <th style="width: 80px;">Reactions</th>
+                </tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+        </table>
+    </div>
+
+    <script>
+        let allIssues = [];
+
+        // Try local static issues.json first, fallback to /api/issues
+        fetch('./issues.json')
+            .then(r => {
+                if (!r.ok) throw new Error();
+                return r.json();
+            })
+            .catch(() => fetch('/api/issues').then(r => r.json()))
+            .then(data => {
+                allIssues = data;
+                updateStats();
+                populateComponents();
+                render();
+            })
+            .catch(err => {
+                document.getElementById('stats').textContent = 'Failed to load issues data.';
+            });
+
+        function updateStats() {
+            document.getElementById('stat-total').textContent = allIssues.length;
+            const actionable = allIssues.filter(i => !i.has_pr && !i.has_assignee);
+            document.getElementById('stat-actionable').textContent = actionable.length;
+            const t1 = allIssues.filter(i => !i.has_pr && !i.has_assignee && i.tier.includes('Tier 1'));
+            document.getElementById('stat-tier1').textContent = t1.length;
+            const claimed = allIssues.filter(i => i.has_pr || i.has_assignee);
+            document.getElementById('stat-claimed').textContent = claimed.length;
+        }
+
+        function populateComponents() {
+            const comps = new Set();
+            allIssues.forEach(i => { if (i.component && i.component !== 'other') comps.add(i.component); });
+            const sel = document.getElementById('filterComponent');
+            Array.from(comps).sort().forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c;
+                opt.textContent = c.replace('comp-', '');
+                sel.appendChild(opt);
+            });
+        }
+
+        function render() {
+            const q = document.getElementById('search').value.toLowerCase().trim();
+            const tier = document.getElementById('filterTier').value;
+            const comp = document.getElementById('filterComponent').value;
+            const noPr = document.getElementById('onlyNoPR').checked;
+            const sortBy = document.getElementById('sortBy').value;
+
+            let filtered = allIssues.filter(i => {
+                if (noPr && (i.has_pr || i.has_assignee)) return false;
+                if (tier && !i.tier.includes(tier)) return false;
+                if (comp && i.component !== comp) return false;
+                if (q) {
+                    const inTitle = i.title.toLowerCase().includes(q);
+                    const inLabels = (i.labels || []).some(l => l.toLowerCase().includes(q));
+                    const inNum = String(i.number).includes(q);
+                    if (!inTitle && !inLabels && !inNum) return false;
+                }
+                return true;
+            });
+
+            filtered.sort((a, b) => {
+                if (sortBy === 'score_desc') return b.priority_score - a.priority_score;
+                if (sortBy === 'reactions_desc') return b.reactions_count - a.reactions_count;
+                if (sortBy === 'comments_desc') return b.comments_count - a.comments_count;
+                if (sortBy === 'newest') return new Date(b.created_at) - new Date(a.created_at);
+                return 0;
+            });
+
+            document.getElementById('stats').textContent = `Showing ${filtered.length} of ${allIssues.length} issues`;
+
+            const tbody = document.getElementById('tbody');
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:32px; color:#8b949e;">No matching issues found.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = filtered.slice(0, 150).map(i => {
+                let tierClass = 'badge-t4';
+                if (i.tier.includes('Tier 1')) tierClass = 'badge-t1';
+                else if (i.tier.includes('Tier 2')) tierClass = 'badge-t2';
+                else if (i.tier.includes('Tier 3')) tierClass = 'badge-t3';
+
+                const compName = (i.component || 'other').replace('comp-', '');
+                const labelPills = (i.labels || []).slice(0, 4).map(l => `<span class="label-pill">${escapeHtml(l)}</span>`).join('');
+
+                return `<tr>
+                    <td><span class="score-pill">${i.priority_score}</span></td>
+                    <td><a href="${i.url}" target="_blank">#${i.number}</a></td>
+                    <td>
+                        <a href="${i.url}" target="_blank" style="color:#f0f6fc; display:block; margin-bottom:4px;">${escapeHtml(i.title)}</a>
+                        <div>${labelPills}</div>
+                    </td>
+                    <td><span class="badge badge-comp">${compName}</span></td>
+                    <td><span class="badge ${tierClass}">${i.tier.split(' ')[0] + ' ' + i.tier.split(' ')[1]}</span></td>
+                    <td>👍 ${i.reactions_count}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        function escapeHtml(str) {
+            return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+    </script>
+</body>
+</html>
